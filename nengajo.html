@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>年賀状メーカー</title>
+<style>
+  :root { --accent: #c8102e; --ink: #222; --line: #ddd; --bg: #f5f3ee; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif; color: var(--ink); background: var(--bg); }
+  header { padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 20px; }
+  header small { color: #777; }
+  .app { display: grid; grid-template-columns: minmax(320px, 460px) 1fr; gap: 20px; padding: 20px; align-items: start; }
+  @media (max-width: 900px) { .app { grid-template-columns: 1fr; } }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1; padding: 12px 4px; border: 0; background: #fafafa; font-size: 14px; cursor: pointer; border-bottom: 3px solid transparent; }
+  .tabs button.on { background: #fff; border-bottom-color: var(--accent); font-weight: bold; }
+  .tab { display: none; padding: 16px; }
+  .tab.on { display: block; }
+  h2 { font-size: 15px; margin: 18px 0 8px; padding-left: 8px; border-left: 4px solid var(--accent); }
+  h2:first-child { margin-top: 0; }
+  label { display: block; font-size: 12px; color: #555; margin: 8px 0 3px; }
+  input[type=text], input[type=number], textarea, select { width: 100%; padding: 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; }
+  textarea { resize: vertical; }
+  .row { display: flex; gap: 8px; }
+  .row > * { flex: 1; min-width: 0; }
+  .btn { padding: 9px 14px; font-size: 14px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: bold; }
+  .btn.big { width: 100%; padding: 14px; font-size: 16px; margin-top: 8px; }
+  .btn.mini { padding: 3px 8px; font-size: 12px; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .hint { font-size: 12px; color: #777; line-height: 1.6; margin: 6px 0; }
+  table.list { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+  table.list td, table.list th { padding: 6px 4px; border-bottom: 1px solid #eee; text-align: left; }
+  table.list tr.cur { background: #fff4f4; }
+  table.list td.name { cursor: pointer; }
+  .previews { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .previews figure { margin: 0; }
+  .previews figcaption { text-align: center; font-size: 13px; color: #666; margin-bottom: 8px; }
+  .swatches { display: flex; gap: 8px; }
+  .swatches button { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #fff; outline: 1px solid #ccc; cursor: pointer; }
+  .swatches button.on { outline: 3px solid #333; }
+  #print-area { display: none; }
+
+  /* ===== はがき (100mm × 148mm) ===== */
+  .card { position: relative; width: 100mm; height: 148mm; background: #fff; overflow: hidden; color: #111; box-shadow: 0 2px 12px rgba(0,0,0,.18); }
+  .f-mincho { font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS PMincho", "Noto Serif CJK JP", "Noto Serif JP", "IPAexMincho", "IPAMincho", "IPAGothic", serif; }
+  .f-fude { font-family: "HG行書体", "HGS行書体", "HG正楷書体-PRO", "Yu Kyokasho N", "YuKyokasho", "UD デジタル 教科書体 N-R", "Klee", "Yu Mincho", "Hiragino Mincho ProN", "IPAexMincho", "IPAMincho", "IPAGothic", serif; }
+  .f-gothic { font-family: "Yu Gothic", "YuGothic", "Hiragino Sans", "Meiryo", "Noto Sans CJK JP", "IPAGothic", sans-serif; }
+  .inner { position: absolute; inset: 0; }
+  /* 宛名面 */
+  .zip span { position: absolute; top: 12mm; width: 5.7mm; height: 8mm; line-height: 8mm; text-align: center; font-size: 6.2mm; font-family: "Yu Gothic", "Hiragino Sans", "Meiryo", sans-serif; }
+  .guide { position: absolute; border: 0.3mm solid #f3a0a0; }
+  .v { writing-mode: vertical-rl; white-space: nowrap; }
+  .to-addr { position: absolute; top: 30mm; right: 9mm; height: 100mm; line-height: 1.35; }
+  .to-addr .l2 { text-align: end; }
+  .to-name { position: absolute; top: 36mm; left: 50mm; transform: translateX(-50%); line-height: 1.3; letter-spacing: .08em; }
+  .from-zip { position: absolute; left: 6mm; top: 62mm; font-size: 3.4mm; letter-spacing: .05em; }
+  .from { position: absolute; left: 6mm; top: 68mm; height: 58mm; font-size: 3.6mm; line-height: 1.4; }
+  .from .l2, .from .nm { text-align: end; }
+  .from .nm { font-size: 4.8mm; letter-spacing: .08em; }
+  /* 裏面 */
+  .ura .greet { color: var(--c); font-weight: bold; }
+  .ura .msg { white-space: pre-wrap; line-height: 1.9; }
+  .ura svg.sheep { position: absolute; }
+  .ura.t-wa .greet { position: absolute; top: 10mm; right: 9mm; height: 128mm; writing-mode: vertical-rl; letter-spacing: .1em; line-height: 1.2; }
+  .ura.t-wa .msg { position: absolute; top: 22mm; right: 34mm; height: 84mm; writing-mode: vertical-rl; font-size: 4.1mm; }
+  .ura.t-wa .year { position: absolute; left: 8mm; top: 20mm; writing-mode: vertical-rl; font-size: 4.2mm; letter-spacing: .15em; }
+  .ura.t-wa svg.sheep { left: 12mm; bottom: 9mm; width: 50mm; }
+  .ura.t-wa .sun { position: absolute; left: 20mm; top: 22mm; width: 26mm; height: 26mm; border-radius: 50%; background: var(--c); opacity: .9; }
+  .ura.t-modern { text-align: center; }
+  .ura.t-modern .en { position: absolute; top: 14mm; left: 0; right: 0; font-size: 4.2mm; letter-spacing: .45em; text-indent: .45em; color: var(--c); font-family: Georgia, "Times New Roman", serif; }
+  .ura.t-modern .num { position: absolute; top: 20mm; left: 0; right: 0; font-size: 22mm; line-height: 1.2; color: var(--c); font-family: Georgia, "Times New Roman", serif; letter-spacing: .05em; }
+  .ura.t-modern svg.sheep { left: 28mm; top: 50mm; width: 44mm; }
+  .ura.t-modern .greet { position: absolute; top: 90mm; left: 8mm; right: 8mm; }
+  .ura.t-modern .msg { position: absolute; top: 103mm; left: 10mm; right: 10mm; font-size: 3.6mm; }
+  .ura.t-modern .year { position: absolute; bottom: 9mm; left: 0; right: 0; font-size: 3.6mm; letter-spacing: .2em; }
+  .ura.t-photo .photo { position: absolute; top: 7mm; left: 7mm; right: 7mm; height: 86mm; background: #eee center/cover no-repeat; display: flex; align-items: center; justify-content: center; color: #999; font-size: 4mm; }
+  .ura.t-photo .greet { position: absolute; top: 98mm; left: 7mm; right: 7mm; text-align: center; }
+  .ura.t-photo .msg { position: absolute; top: 111mm; left: 9mm; right: 9mm; font-size: 3.5mm; text-align: center; line-height: 1.7; }
+  .ura.t-photo .year { position: absolute; bottom: 7mm; left: 0; right: 0; text-align: center; font-size: 3.4mm; letter-spacing: .2em; }
+
+  @page { size: 100mm 148mm; margin: 0; }
+  @media print {
+    html, body { background: #fff; }
+    header, .app { display: none !important; }
+    #print-area { display: block; }
+    .card { box-shadow: none; break-after: page; page-break-after: always; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .guide, .placeholder { display: none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎍 年賀状メーカー</h1>
+  <small>2027年(令和9年・未年)/ 入力した内容はこのパソコンのブラウザ内だけに保存されます</small>
+</header>
+
+<div class="app">
+  <div class="panel">
+    <div class="tabs">
+      <button data-tab="t-addr" class="on">① 住所録</button>
+      <button data-tab="t-ura">② 裏面デザイン</button>
+      <button data-tab="t-print">③ 印刷</button>
+    </div>
+
+    <div class="tab on" id="t-addr">
+      <h2>差出人(自分)</h2>
+      <div class="row">
+        <div><label>氏名</label><input type="text" id="s-name" placeholder="田中 一郎"></div>
+        <div style="flex:.6"><label>郵便番号</label><input type="text" id="s-zip" placeholder="123-4567"></div>
+      </div>
+      <label>住所</label><input type="text" id="s-a1" placeholder="東京都〇〇区〇〇1-2-3">
+      <label>建物名など(任意)</label><input type="text" id="s-a2">
+
+      <h2>送り先</h2>
+      <div class="row">
+        <div><label>氏名(姓と名の間にスペース)</label><input type="text" id="c-name" placeholder="山田 太郎"></div>
+        <div style="flex:.4"><label>敬称</label>
+          <select id="c-title"><option>様</option><option>先生</option><option>御中</option><option>殿</option><option value="">なし</option></select></div>
+      </div>
+      <div class="row">
+        <div style="flex:.6"><label>郵便番号</label><input type="text" id="c-zip" placeholder="100-0001"></div>
+        <div><label>連名(任意・「、」区切り)</label><input type="text" id="c-joint" placeholder="花子、次郎"></div>
+      </div>
+      <label>住所</label><input type="text" id="c-a1" placeholder="東京都千代田区千代田1-1">
+      <label>建物名など(任意)</label><input type="text" id="c-a2">
+      <div class="btns">
+        <button class="btn primary" id="c-save">追加する</button>
+        <button class="btn" id="c-new" hidden>新規入力に戻る</button>
+      </div>
+
+      <table class="list"><thead><tr><th style="width:30px"><input type="checkbox" id="chk-all" title="全選択"></th><th>氏名</th><th>住所</th><th></th></tr></thead><tbody id="list"></tbody></table>
+      <div class="btns">
+        <button class="btn mini" id="csv-in">CSVを読み込む</button>
+        <button class="btn mini" id="csv-out">CSVで保存</button>
+        <input type="file" id="csv-file" accept=".csv,text/csv" hidden>
+      </div>
+      <p class="hint">CSVの列順:氏名, 敬称, 郵便番号, 住所, 建物名, 連名(1行目は見出し)。Excelで作った住所録もそのまま読み込めます。</p>
+    </div>
+
+    <div class="tab" id="t-ura">
+      <h2>デザイン</h2>
+      <select id="b-tpl">
+        <option value="wa">和風(縦書き・ひつじ)</option>
+        <option value="modern">シンプル(横書き・2027)</option>
+        <option value="photo">写真入り</option>
+      </select>
+      <label>色</label>
+      <div class="swatches" id="b-colors"></div>
+      <label>賀詞</label>
+      <select id="b-greet">
+        <option>謹賀新年</option><option>恭賀新年</option><option>迎春</option><option>賀正</option>
+        <option>あけましておめでとうございます</option><option>Happy New Year</option>
+      </select>
+      <label>メッセージ(改行できます)</label>
+      <textarea id="b-msg" rows="4"></textarea>
+      <label>日付</label><input type="text" id="b-year">
+      <div id="photo-box">
+        <label>写真</label>
+        <input type="file" id="b-photo" accept="image/*">
+      </div>
+      <label>書体(宛名面・裏面共通)</label>
+      <select id="font"><option value="mincho">明朝体</option><option value="fude">毛筆・楷書風(パソコンに入っていれば)</option><option value="gothic">ゴシック体</option></select>
+    </div>
+
+    <div class="tab" id="t-print">
+      <h2>宛名面</h2>
+      <p class="hint">住所録でチェックを入れた <b id="sel-n">0</b> 件を、1人1枚ずつ印刷します。</p>
+      <button class="btn primary big" id="p-atena">宛名面を印刷する</button>
+      <div class="row">
+        <div><label>位置調整 横(mm・右が+)</label><input type="number" id="adj-x" step="0.5"></div>
+        <div><label>位置調整 縦(mm・下が+)</label><input type="number" id="adj-y" step="0.5"></div>
+      </div>
+      <p class="hint">郵便番号が枠からずれるときだけ、ここで動かしてください。</p>
+      <h2>裏面</h2>
+      <button class="btn primary big" id="p-ura">裏面を印刷する</button>
+      <p class="hint">枚数は印刷画面の「部数」で指定します。</p>
+      <h2>印刷画面での設定</h2>
+      <p class="hint">
+        ・用紙サイズ:<b>はがき</b>(100×148mm)<br>
+        ・倍率:<b>100%</b>(「用紙に合わせる」はオフ)<br>
+        ・余白:<b>なし</b> / ヘッダーとフッター:オフ<br>
+        ・裏面は「背景のグラフィック」をオン<br>
+        ・最初の1枚は、はがきサイズに切った普通紙で試し刷りがおすすめです。
+      </p>
+    </div>
+  </div>
+
+  <div class="previews">
+    <figure><figcaption>宛名面</figcaption><div id="pv-atena"></div></figure>
+    <figure><figcaption>裏面</figcaption><div id="pv-ura"></div></figure>
+  </div>
+</div>
+
+<div id="print-area"></div>
+
+<script>
+const KEY = 'nengajo-v1';
+const COLORS = ['#c8102e', '#a67c00', '#1f3a5f', '#2e6b4f', '#222222'];
+const $ = id => document.getElementById(id);
+const h = (tag, props = {}, ...kids) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'style') e.style.cssText = v; else if (k === 'class') e.className = v; else e[k] = v;
+  }
+  for (const k of kids) e.append(k);
+  return e;
+};
+
+const defaults = () => ({
+  sender: { name: '', zip: '', a1: '', a2: '' },
+  contacts: [{ id: 1, on: true, name: '山田 太郎', title: '様', zip: '100-0001', a1: '東京都千代田区千代田1-1', a2: '', joint: '' }],
+  back: { tpl: 'wa', color: COLORS[0], greet: '謹賀新年', msg: '旧年中は大変お世話になりました\n本年もどうぞよろしくお願いいたします', year: '令和九年 元旦', photo: '' },
+  font: 'mincho', adj: { x: 0, y: 0 }, cur: 1, nextId: 2,
+});
+let S = defaults();
+try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.contacts) S = Object.assign(S, d); } catch (e) {}
+const save = () => {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch (e) { try { localStorage.setItem(KEY, JSON.stringify({ ...S, back: { ...S.back, photo: '' } })); } catch (e2) {} }
+};
+
+/* ---------- 縦書き用の文字変換 ---------- */
+const KANJI = '〇一二三四五六七八九';
+const toVertical = s => (s || '')
+  .replace(/[0-9０-９]/g, d => KANJI['0123456789'.includes(d) ? +d : d.charCodeAt(0) - 0xFF10])
+  .replace(/[-‐‑–—−－ｰ]/g, 'ー')
+  .replace(/[A-Za-z]/g, c => String.fromCharCode(c.charCodeAt(0) + 0xFEE0))
+  .replace(/ /g, '　');
+const digits = s => (s || '').replace(/[０-９]/g, d => d.charCodeAt(0) - 0xFF10).replace(/\D/g, '').slice(0, 7);
+const fmtZip = s => { const d = digits(s); return d.length > 3 ? d.slice(0, 3) + '-' + d.slice(3) : d; };
+
+/* ---------- 宛名面 ---------- */
+const ZIP_X = [44.3, 51.3, 58.3, 65.9, 72.7, 79.5, 86.3];
+function buildAtena(c) {
+  const card = h('div', { class: 'card atena f-' + S.font });
+  ZIP_X.forEach(x => card.append(h('div', { class: 'guide', style: `left:${x}mm;top:12mm;width:5.7mm;height:8mm` })));
+  const inner = h('div', { class: 'inner', style: `transform:translate(${S.adj.x || 0}mm,${S.adj.y || 0}mm)` });
+  card.append(inner);
+  if (!c) return card;
+
+  const zip = h('div', { class: 'zip' });
+  [...digits(c.zip)].forEach((d, i) => zip.append(h('span', { style: `left:${ZIP_X[i]}mm` }, d)));
+  inner.append(zip);
+
+  const a1 = toVertical(c.a1), a2 = toVertical(c.a2);
+  const aSize = Math.min(5.2, 98 / Math.max(a1.length, a2.length, 1));
+  const addr = h('div', { class: 'v to-addr', style: `font-size:${aSize}mm` }, h('div', {}, a1));
+  if (a2) addr.append(h('div', { class: 'l2' }, a2));
+  inner.append(addr);
+
+  const [sei, ...rest] = (c.name || '').trim().split(/[\s　]+/);
+  const mei = rest.join('');
+  const t = c.title ? '　' + c.title : '';
+  const main = mei ? sei + '　' + mei + t : sei + t;
+  const joints = (c.joint || '').split(/[、,，]/).map(s => s.trim()).filter(Boolean);
+  const longest = Math.max(main.length, ...joints.map(j => sei.length + 1 + j.length + t.length));
+  const nSize = Math.min(joints.length ? 8 : 9.5, 95 / Math.max(longest, 1));
+  const name = h('div', { class: 'v to-name', style: `font-size:${nSize}mm` }, h('div', {}, main));
+  joints.forEach(j => name.append(h('div', { style: `padding-top:${mei ? (sei.length + 1) * 1.08 : 0}em` }, j + t)));
+  inner.append(name);
+
+  const s = S.sender;
+  if (s.name || s.a1) {
+    if (digits(s.zip)) inner.append(h('div', { class: 'from-zip' }, '〒' + fmtZip(s.zip)));
+    const from = h('div', { class: 'v from' });
+    const f1 = toVertical(s.a1), f2 = toVertical(s.a2);
+    const fl = Math.max(f1.length, f2.length);
+    if (fl > 15) from.style.fontSize = Math.max(2.4, 3.6 * 15 / fl) + 'mm';
+    if (f1) from.append(h('div', {}, f1));
+    if (f2) from.append(h('div', { class: 'l2' }, f2));
+    if (s.name) from.append(h('div', { class: 'nm' }, toVertical(s.name)));
+    inner.append(from);
+  }
+  return card;
+}
+
+/* ---------- 裏面 ---------- */
+function sheep() {
+  const wool = [[62, 82], [80, 60], [108, 54], [136, 64], [148, 88], [130, 108], [100, 114], [72, 106]]
+    .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="24"/>`).join('');
+  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  s.setAttribute('viewBox', '0 0 200 170'); s.setAttribute('class', 'sheep');
+  s.innerHTML = `
+    <g fill="var(--c)"><rect x="76" y="118" width="9" height="40" rx="4"/><rect x="122" y="118" width="9" height="40" rx="4"/></g>
+    <g fill="#fff" stroke="var(--c)" stroke-width="4">${wool}</g>
+    <ellipse cx="104" cy="85" rx="42" ry="30" fill="#fff"/>
+    <g fill="var(--c)">
+      <ellipse cx="22" cy="62" rx="12" ry="6" transform="rotate(25 22 62)"/>
+      <ellipse cx="70" cy="62" rx="12" ry="6" transform="rotate(-25 70 62)"/>
+      <ellipse cx="46" cy="78" rx="20" ry="25"/>
+    </g>
+    <g fill="#fff" stroke="var(--c)" stroke-width="4"><circle cx="36" cy="54" r="9"/><circle cx="56" cy="54" r="9"/><circle cx="46" cy="49" r="10"/></g>
+    <circle cx="46" cy="56" r="8" fill="#fff"/>
+    <g fill="#fff"><circle cx="38" cy="76" r="3"/><circle cx="54" cy="76" r="3"/></g>
+    <path d="M41 90 q5 4 10 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>`;
+  return s;
+}
+function buildUra() {
+  const b = S.back;
+  const card = h('div', { class: `card ura t-${b.tpl} f-${S.font}`, style: `--c:${b.color}` });
+  const n = Math.max(b.greet.length, 1);
+  const ascii = /^[\x20-\x7e]+$/.test(b.greet);
+  const greet = h('div', { class: 'greet' }, b.tpl === 'wa' ? toVertical(b.greet) : b.greet);
+  const msg = h('div', { class: 'msg' }, b.tpl === 'wa' ? toVertical(b.msg).replace(/　*\n　*/g, '\n') : b.msg);
+  const year = h('div', { class: 'year' }, b.tpl === 'wa' ? toVertical(b.year) : b.year);
+  if (b.tpl === 'wa') {
+    greet.style.fontSize = Math.min(17, 118 / n / 1.1) + 'mm';
+    card.append(h('div', { class: 'sun' }), sheep(), greet, msg, year);
+  } else if (b.tpl === 'modern') {
+    greet.style.fontSize = Math.min(8, 80 / n / (ascii ? .55 : 1)) + 'mm';
+    card.append(h('div', { class: 'en' }, 'HAPPY NEW YEAR'), h('div', { class: 'num' }, '2027'), sheep(), greet, msg, year);
+  } else {
+    greet.style.fontSize = Math.min(8, 82 / n / (ascii ? .55 : 1)) + 'mm';
+    const photo = h('div', { class: 'photo' });
+    if (b.photo) photo.style.backgroundImage = `url("${b.photo}")`;
+    else photo.append(h('span', { class: 'placeholder' }, '写真を選んでください'));
+    card.append(photo, greet, msg, year);
+  }
+  return card;
+}
+
+/* ---------- 画面 ---------- */
+let editing = null;
+const cur = () => S.contacts.find(c => c.id === S.cur) || S.contacts[0];
+function render() {
+  $('pv-atena').replaceChildren(buildAtena(cur()));
+  $('pv-ura').replaceChildren(buildUra());
+  const list = $('list'); list.replaceChildren();
+  S.contacts.forEach(c => {
+    const chk = h('input', { type: 'checkbox', checked: !!c.on, onchange: e => { c.on = e.target.checked; save(); render(); } });
+    const del = h('button', { class: 'btn mini', onclick: () => {
+      if (!confirm(c.name + ' を削除しますか?')) return;
+      S.contacts = S.contacts.filter(x => x !== c); if (editing === c.id) startNew(); save(); render();
+    } }, '削除');
+    const pick = () => { S.cur = c.id; startEdit(c); save(); render(); };
+    list.append(h('tr', { class: cur() === c ? 'cur' : '' },
+      h('td', {}, chk), h('td', { class: 'name', onclick: pick }, c.name + (c.joint ? '・' + c.joint : '')),
+      h('td', { class: 'name', onclick: pick }, c.a1), h('td', {}, del)));
+  });
+  $('sel-n').textContent = S.contacts.filter(c => c.on).length;
+  $('chk-all').checked = S.contacts.length > 0 && S.contacts.every(c => c.on);
+  $('photo-box').hidden = S.back.tpl !== 'photo';
+  [...$('b-colors').children].forEach(b => b.classList.toggle('on', b.dataset.c === S.back.color));
+}
+function startEdit(c) {
+  editing = c.id;
+  $('c-name').value = c.name; $('c-title').value = c.title; $('c-zip').value = c.zip;
+  $('c-a1').value = c.a1; $('c-a2').value = c.a2; $('c-joint').value = c.joint;
+  $('c-save').textContent = '変更を保存'; $('c-new').hidden = false;
+}
+function startNew() {
+  editing = null;
+  ['c-name', 'c-zip', 'c-a1', 'c-a2', 'c-joint'].forEach(id => $(id).value = '');
+  $('c-title').value = '様'; $('c-save').textContent = '追加する'; $('c-new').hidden = true;
+}
+const formContact = () => ({ name: $('c-name').value.trim(), title: $('c-title').value, zip: fmtZip($('c-zip').value), a1: $('c-a1').value.trim(), a2: $('c-a2').value.trim(), joint: $('c-joint').value.trim() });
+
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.id === b.dataset.tab));
+});
+// 編集中は入力のたびにプレビューへ反映
+['c-name', 'c-title', 'c-zip', 'c-a1', 'c-a2', 'c-joint'].forEach(id => $(id).addEventListener('input', () => {
+  if (editing == null) return;
+  const c = S.contacts.find(x => x.id === editing); if (!c) return;
+  Object.assign(c, formContact()); save(); render();
+}));
+$('c-save').onclick = () => {
+  const f = formContact();
+  if (!f.name) { alert('氏名を入力してください'); return; }
+  if (editing != null) { startNew(); render(); return; }
+  const c = { id: S.nextId++, on: true, ...f };
+  S.contacts.push(c); S.cur = c.id; startNew(); save(); render();
+};
+$('c-new').onclick = () => { startNew(); };
+$('chk-all').onchange = e => { S.contacts.forEach(c => c.on = e.target.checked); save(); render(); };
+
+const bind = (id, get, set) => { $(id).value = get(); $(id).addEventListener('input', e => { set(e.target.value); save(); render(); }); };
+bind('s-name', () => S.sender.name, v => S.sender.name = v);
+bind('s-zip', () => S.sender.zip, v => S.sender.zip = v);
+bind('s-a1', () => S.sender.a1, v => S.sender.a1 = v);
+bind('s-a2', () => S.sender.a2, v => S.sender.a2 = v);
+bind('b-tpl', () => S.back.tpl, v => S.back.tpl = v);
+bind('b-greet', () => S.back.greet, v => S.back.greet = v);
+bind('b-msg', () => S.back.msg, v => S.back.msg = v);
+bind('b-year', () => S.back.year, v => S.back.year = v);
+bind('font', () => S.font, v => S.font = v);
+bind('adj-x', () => S.adj.x, v => S.adj.x = parseFloat(v) || 0);
+bind('adj-y', () => S.adj.y, v => S.adj.y = parseFloat(v) || 0);
+COLORS.forEach(c => $('b-colors').append(h('button', { style: `background:${c}`, title: c, onclick: () => { S.back.color = c; save(); render(); } })));
+[...$('b-colors').children].forEach((b, i) => b.dataset.c = COLORS[i]);
+
+$('b-photo').onchange = e => {
+  const file = e.target.files[0]; if (!file) return;
+  const img = new Image();
+  img.onload = () => {            // 保存しやすいよう長辺1600pxに縮小
+    const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const cv = h('canvas', { width: Math.round(img.width * k), height: Math.round(img.height * k) });
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    S.back.photo = cv.toDataURL('image/jpeg', .9); URL.revokeObjectURL(img.src); save(); render();
+  };
+  img.onerror = () => alert('この画像は読み込めませんでした');
+  img.src = URL.createObjectURL(file);
+};
+
+/* ---------- CSV ---------- */
+function parseCSV(t) {
+  const rows = []; let row = [], cur = '', q = false;
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (q) { if (ch === '"') { if (t[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',' || ch === '\t') { row.push(cur); cur = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && t[i + 1] === '\n') i++; row.push(cur); rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+const COLS = { name: ['氏名', '名前', '宛名'], title: ['敬称'], zip: ['郵便番号', '〒'], a1: ['住所', '住所1', '住所１'], a2: ['建物名', '住所2', '住所２', '建物'], joint: ['連名'] };
+$('csv-in').onclick = () => $('csv-file').click();
+$('csv-file').onchange = async e => {
+  const file = e.target.files[0]; if (!file) return;
+  const buf = await file.arrayBuffer(); let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (err) { text = new TextDecoder('shift_jis').decode(buf); }
+  const rows = parseCSV(text.replace(/^﻿/, ''));
+  if (!rows.length) { alert('データが見つかりませんでした'); return; }
+  const head = rows[0].map(x => x.trim());
+  const hasHead = head.some(x => Object.values(COLS).flat().includes(x));
+  const idx = {}; Object.keys(COLS).forEach((k, i) => { const j = head.findIndex(x => COLS[k].includes(x)); idx[k] = hasHead ? j : i; });
+  let n = 0;
+  rows.slice(hasHead ? 1 : 0).forEach(r => {
+    const g = k => (idx[k] >= 0 && r[idx[k]] || '').trim();
+    if (!g('name')) return;
+    S.contacts.push({ id: S.nextId++, on: true, name: g('name'), title: idx.title >= 0 && r[idx.title] !== undefined ? g('title') : '様', zip: fmtZip(g('zip')), a1: g('a1'), a2: g('a2'), joint: g('joint') });
+    n++;
+  });
+  e.target.value = ''; save(); render(); alert(n + ' 件を読み込みました');
+};
+$('csv-out').onclick = () => {
+  const q = s => '"' + (s || '').replace(/"/g, '""') + '"';
+  const lines = [['氏名', '敬称', '郵便番号', '住所', '建物名', '連名'].join(',')]
+    .concat(S.contacts.map(c => [c.name, c.title, c.zip, c.a1, c.a2, c.joint].map(q).join(',')));
+  const a = h('a', { href: URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' })), download: '年賀状住所録.csv' });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
+/* ---------- 印刷 ---------- */
+function printCards(cards) {
+  $('print-area').replaceChildren(...cards);
+  setTimeout(() => window.print(), 100);
+}
+$('p-atena').onclick = () => {
+  const sel = S.contacts.filter(c => c.on);
+  if (!sel.length) { alert('住所録で印刷したい人にチェックを入れてください'); return; }
+  printCards(sel.map(buildAtena));
+};
+$('p-ura').onclick = () => {
+  if (S.back.tpl === 'photo' && !S.back.photo && !confirm('写真がまだ選ばれていません。このまま印刷しますか?')) return;
+  printCards([buildUra()]);
+};
+
+render();
+</script>
+</body>
+</html>
